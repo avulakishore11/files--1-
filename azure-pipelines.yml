@@ -154,5 +154,5 @@ stages:
                           "name": "JIRA_BASE_URL",
                           "value": "https://kishore32780.atlassian.net",
                           "slotSetting": false
-                        },
+                        }
                       ]
