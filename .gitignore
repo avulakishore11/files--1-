@@ -1,0 +1,18 @@
+# Azure Functions — never commit secrets
+local.settings.json
+.python_packages/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+venv/
+.venv/
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
