@@ -137,7 +137,7 @@ def update_work_item(work_item_id: int, summary: str, description: str, priority
 # ─────────────────────────────────────────────────────────────
 # MAIN: HTTP Trigger — receives Jira webhook POST
 # ─────────────────────────────────────────────────────────────
-@app.route(route="jira_to_ado", methods=["POST"])
+@app.route(route="jira-to-ado", methods=["POST"])
 def jira_to_ado(req: func.HttpRequest) -> func.HttpResponse:
 
     logging.info("─── Jira webhook received ───")
