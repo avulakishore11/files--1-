@@ -155,9 +155,4 @@ stages:
                           "value": "https://kishore32780.atlassian.net",
                           "slotSetting": false
                         },
-                        {
-                          "name": "FUNCTIONS_WORKER_RUNTIME",
-                          "value": "python",
-                          "slotSetting": false
-                        }
                       ]
