@@ -42,6 +42,12 @@ stages:
               versionSpec: '$(pythonVersion)'
 
           - bash: |
+              pip install \
+                --target="$(System.DefaultWorkingDirectory)/.python_packages/lib/site-packages" \
+                -r requirements.txt
+            displayName: 'Install dependencies into .python_packages'
+
+          - bash: |
               zip -r $(Build.ArtifactStagingDirectory)/release.zip . \
                 --exclude=".git/*" \
                 --exclude=".github/*" \
@@ -52,7 +58,7 @@ stages:
                 --exclude="*.pyc" \
                 --exclude="azure-pipelines.yml" \
                 --exclude="main.yml"
-            displayName: 'Zip source files'
+            displayName: 'Zip source + packages'
 
           - task: PublishBuildArtifacts@1
             displayName: 'Publish artifact'
@@ -98,16 +104,6 @@ stages:
                     resourceGroupName: '$(resourceGroup)'
                     appSettings: |
                       [
-                        {
-                          "name": "SCM_DO_BUILD_DURING_DEPLOYMENT",
-                          "value": "true",
-                          "slotSetting": false
-                        },
-                        {
-                          "name": "ENABLE_ORYX_BUILD",
-                          "value": "true",
-                          "slotSetting": false
-                        },
                         {
                           "name": "FUNCTIONS_WORKER_RUNTIME",
                           "value": "python",
