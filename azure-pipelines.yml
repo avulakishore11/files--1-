@@ -87,17 +87,13 @@ stages:
             deploy:
               steps:
                 # Artifacts are auto-downloaded to $(Pipeline.Workspace)/<ArtifactName>/
-                - task: AzureCLI@2
+                - task: AzureFunctionApp@2
                   displayName: 'Deploy to Azure Functions'
                   inputs:
                     azureSubscription: '$(azureServiceConnection)'
-                    scriptType: 'bash'
-                    scriptLocation: 'inlineScript'
-                    inlineScript: |
-                      az functionapp deployment source config-zip \
-                        --resource-group $(resourceGroup) \
-                        --name $(functionAppName) \
-                        --src $(Pipeline.Workspace)/drop/release.zip
+                    appType: 'functionAppLinux'
+                    appName: '$(functionAppName)'
+                    package: '$(Pipeline.Workspace)/drop/release.zip'
 
                 - task: AzureAppServiceSettings@1
                   displayName: 'Apply app settings'
