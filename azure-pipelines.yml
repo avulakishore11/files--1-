@@ -1,7 +1,7 @@
 
 # Azure DevOps CI/CD Pipeline
 # Project      : Jira → Azure Boards Sync
-# Function App : func-jira-ado-sync (Linux Consumption)
+# Function App : func-jira-ado-sync (Flex Consumption)
 # Runtime      : Python 3.11
 
 trigger:
