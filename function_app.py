@@ -1,4 +1,4 @@
-import azure.functions as func
+fimport azure.functions as func
 import requests
 import json
 import base64

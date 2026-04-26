@@ -1,0 +1,158 @@
+
+# Azure DevOps CI/CD Pipeline
+# Project      : Jira → Azure Boards Sync
+# Function App : func-jira-ado-sync (Flex Consumption)
+# Runtime      : Python 3.11 / Linux
+
+trigger:
+  branches:
+    include:
+      - main
+
+variables:
+# Azure settings 
+  azureServiceConnection: 'ado-2-azure'        # ARM service connection name in ADO
+  functionAppName: 'func-jira-ado-sync'             # Function App name in Azure
+  resourceGroup: 'kaseya-rg'                  # Resource group
+  # ── Build settings ─
+  pythonVersion: '3.11'
+  workingDirectory: '$(System.DefaultWorkingDirectory)'
+
+# ─────────────────────────────────────────────────────────────
+# STAGE 1 — BUILD
+# ─────────────────────────────────────────────────────────────
+stages:
+  - stage: Build
+    displayName: 'Build — Install & Packag'
+    jobs:
+      - job: BuildJob
+        displayName: 'Build Python Function App'
+        pool:
+          vmImage: 'ubuntu-latest'
+
+        steps:
+          # ── Step 1: Checkout code ───────────────────────────
+          - checkout: self
+            displayName: 'Checkout repository'
+
+          # ── Step 2: Set Python version ──────────────────────
+          - task: UsePythonVersion@0
+            displayName: 'Use Python $(pythonVersion)'
+            inputs:
+              versionSpec: '$(pythonVersion)'
+
+          # ── Step 3: Install dependencies ────────────────────
+          - script: |
+              python -m pip install --upgrade pip
+              pip install \
+                --target="$(workingDirectory)/.python_packages/lib/site-packages" \
+                -r requirements.txt
+            workingDirectory: $(workingDirectory)
+            displayName: 'Install Python dependencies'
+
+          # ── Step 4: Validate function_app.py syntax ─────────
+          - script: |
+              python -m py_compile function_app.py
+              echo "Syntax check passed"
+            workingDirectory: $(workingDirectory)
+            displayName: 'Validate Python syntax'
+
+          # ── Step 5: Archive files for deployment ────────────
+          - task: ArchiveFiles@2
+            displayName: 'Zip artifact for deployment'
+            inputs:
+              rootFolderOrFile: '$(workingDirectory)'
+              includeRootFolder: false
+              archiveType: 'zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/release.zip'
+              replaceExistingArchive: true
+              excludePaths: |
+                .git
+                .github
+                local.settings.json
+                __pycache__
+                .venv
+                venv
+
+          # ── Step 6: Publish artifact ────────────────────────
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish build artifact'
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)/release.zip'
+              ArtifactName: 'python-app'
+              publishLocation: 'Container'
+
+# ─────────────────────────────────────────────────────────────
+# STAGE 2 — DEPLOY
+# ─────────────────────────────────────────────────────────────
+  - stage: Deploy
+    displayName: 'Deploy — Azure Function App'
+    dependsOn: Build
+    condition: succeeded()
+
+    jobs:
+      - deployment: DeployJob
+        displayName: 'Deploy to func-jira-ado-sync'
+        pool:
+          vmImage: 'ubuntu-latest'
+        environment: 'production'
+
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                # ── Step 1: Download artifact ─────────────────
+                - task: DownloadBuildArtifacts@1
+                  displayName: 'Download build artifact'
+                  inputs:
+                    buildType: 'current'
+                    downloadType: 'single'
+                    artifactName: 'python-app'
+                    downloadPath: '$(System.ArtifactsDirectory)'
+
+                # ── Step 2: Deploy to Azure Function App ──────
+                - task: AzureFunctionApp@2
+                  displayName: 'Deploy to Azure Functions (Flex Consumption)'
+                  inputs:
+                    connectedServiceNameARM: '$(azureServiceConnection)'
+                    appType: 'functionAppLinux'
+                    appName: '$(functionAppName)'
+                    package: '$(System.ArtifactsDirectory)/python-app/release.zip'
+                    runtimeStack: 'PYTHON|3.11'
+                    deploymentMethod: 'zipDeploy'
+
+                # ── Step 3: Update App Settings ───────────────
+                - task: AzureAppServiceSettings@1
+                  displayName: 'Apply Function App Settings'
+                  inputs:
+                    azureSubscription: '$(azureServiceConnection)'
+                    appName: '$(functionAppName)'
+                    resourceGroupName: '$(resourceGroup)'
+                    appSettings: |
+                      [
+                        {
+                          "name": "ADO_ORG",
+                          "value": "kavula",
+                          "slotSetting": false
+                        },
+                        {
+                          "name": "ADO_PROJECT",
+                          "value": "Kaseya_infra",
+                          "slotSetting": false
+                        },
+                        {
+                          "name": "ADO_PAT",
+                          "value": "$(ADO_PAT)",
+                          "slotSetting": false
+                        },
+                        {
+                          "name": "JIRA_WEBHOOK_SECRET",
+                          "value": "$(JIRA_WEBHOOK_SECRET)",
+                          "slotSetting": false
+                        },
+                        {
+                          "name": "JIRA_BASE_URL",
+                          "value": "https://kishore32780.atlassian.net",
+                          "slotSetting": false
+                        }
+                      ]
