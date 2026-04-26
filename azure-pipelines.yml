@@ -23,7 +23,7 @@ variables:
 # ─────────────────────────────────────────────────────────────
 stages:
   - stage: Build
-    displayName: 'Build — Install & Package'
+    displayName: 'Build — Install & Packag'
     jobs:
       - job: BuildJob
         displayName: 'Build Python Function App'
