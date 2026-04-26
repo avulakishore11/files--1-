@@ -114,7 +114,7 @@ stages:
                 - task: AzureFunctionApp@2
                   displayName: 'Deploy to Azure Functions (Flex Consumption)'
                   inputs:
-                    connectedServiceNameARM: '$(azureServiceConnection)'
+                    azureSubscription: '$(azureServiceConnection)'
                     appType: 'functionAppLinux'
                     appName: '$(functionAppName)'
                     package: '$(System.ArtifactsDirectory)/python-app/release.zip'
