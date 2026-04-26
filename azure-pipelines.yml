@@ -1,8 +1,8 @@
 
 # Azure DevOps CI/CD Pipeline
 # Project      : Jira → Azure Boards Sync
-# Function App : func-jira-ado-sync (Flex Consumption)
-# Runtime      : Python 3.11 / Linux
+# Function App : func-jira-ado-sync (Linux Consumption)
+# Runtime      : Python 3.11
 
 trigger:
   branches:
@@ -10,83 +10,57 @@ trigger:
       - main
 
 variables:
-# Azure settings 
-  azureServiceConnection: 'ado-2-azure'        # ARM service connection name in ADO
-  functionAppName: 'func-jira-ado-sync'             # Function App name in Azure
-  resourceGroup: 'kaseya-rg'                  # Resource group
-  # ── Build settings ─
+  azureServiceConnection: 'ado-2-azure'
+  functionAppName: 'func-jira-ado-sync'
+  resourceGroup: 'kaseya-rg'
   pythonVersion: '3.11'
-  workingDirectory: '$(System.DefaultWorkingDirectory)'
 
 # ─────────────────────────────────────────────────────────────
 # STAGE 1 — BUILD
 # ─────────────────────────────────────────────────────────────
 stages:
   - stage: Build
-    displayName: 'Build — Install & Packag'
+    displayName: 'Build'
     jobs:
       - job: BuildJob
-        displayName: 'Build Python Function App'
+        displayName: 'Package function app'
         pool:
           vmImage: 'ubuntu-latest'
 
         steps:
-          # ── Step 1: Checkout code ───────────────────────────
           - checkout: self
             displayName: 'Checkout repository'
 
-          # ── Step 2: Set Python version ──────────────────────
           - task: UsePythonVersion@0
             displayName: 'Use Python $(pythonVersion)'
             inputs:
               versionSpec: '$(pythonVersion)'
 
-          # ── Step 3: Install dependencies ────────────────────
-          - script: |
-              python -m pip install --upgrade pip
-              pip install \
-                --target="$(workingDirectory)/.python_packages/lib/site-packages" \
-                -r requirements.txt
-            workingDirectory: $(workingDirectory)
-            displayName: 'Install Python dependencies'
+          - bash: |
+              zip -r $(Build.ArtifactStagingDirectory)/release.zip . \
+                --exclude=".git/*" \
+                --exclude=".github/*" \
+                --exclude="local.settings.json" \
+                --exclude="__pycache__/*" \
+                --exclude=".venv/*" \
+                --exclude="venv/*" \
+                --exclude="*.pyc" \
+                --exclude="azure-pipelines.yml" \
+                --exclude="main.yml"
+            displayName: 'Zip source files'
 
-          # ── Step 4: Validate function_app.py syntax ─────────
-          - script: |
-              python -m py_compile function_app.py
-              echo "Syntax check passed"
-            workingDirectory: $(workingDirectory)
-            displayName: 'Validate Python syntax'
-
-          # ── Step 5: Archive files for deployment ────────────
-          - task: ArchiveFiles@2
-            displayName: 'Zip artifact for deployment'
-            inputs:
-              rootFolderOrFile: '$(workingDirectory)'
-              includeRootFolder: false
-              archiveType: 'zip'
-              archiveFile: '$(Build.ArtifactStagingDirectory)/release.zip'
-              replaceExistingArchive: true
-              excludePaths: |
-                .git
-                .github
-                local.settings.json
-                __pycache__
-                .venv
-                venv
-
-          # ── Step 6: Publish artifact ────────────────────────
           - task: PublishBuildArtifacts@1
-            displayName: 'Publish build artifact'
+            displayName: 'Publish artifact'
             inputs:
               PathtoPublish: '$(Build.ArtifactStagingDirectory)/release.zip'
-              ArtifactName: 'python-app'
+              ArtifactName: 'drop'
               publishLocation: 'Container'
 
 # ─────────────────────────────────────────────────────────────
 # STAGE 2 — DEPLOY
 # ─────────────────────────────────────────────────────────────
   - stage: Deploy
-    displayName: 'Deploy — Azure Function App'
+    displayName: 'Deploy'
     dependsOn: Build
     condition: succeeded()
 
@@ -101,35 +75,39 @@ stages:
           runOnce:
             deploy:
               steps:
-                # ── Step 1: Download artifact ─────────────────
-                - task: DownloadBuildArtifacts@1
-                  displayName: 'Download build artifact'
-                  inputs:
-                    buildType: 'current'
-                    downloadType: 'single'
-                    artifactName: 'python-app'
-                    downloadPath: '$(System.ArtifactsDirectory)'
-
-                # ── Step 2: Deploy to Azure Function App ──────
+                # Artifacts are auto-downloaded to $(Pipeline.Workspace)/<ArtifactName>/
                 - task: AzureFunctionApp@2
-                  displayName: 'Deploy to Azure Functions (Flex Consumption)'
+                  displayName: 'Deploy to Azure Functions'
                   inputs:
                     azureSubscription: '$(azureServiceConnection)'
                     appType: 'functionAppLinux'
                     appName: '$(functionAppName)'
-                    package: '$(System.ArtifactsDirectory)/python-app/release.zip'
-                    runtimeStack: 'PYTHON|3.11'
+                    package: '$(Pipeline.Workspace)/drop/release.zip'
                     deploymentMethod: 'zipDeploy'
 
-                # ── Step 3: Update App Settings ───────────────
                 - task: AzureAppServiceSettings@1
-                  displayName: 'Apply Function App Settings'
+                  displayName: 'Apply app settings'
                   inputs:
                     azureSubscription: '$(azureServiceConnection)'
                     appName: '$(functionAppName)'
                     resourceGroupName: '$(resourceGroup)'
                     appSettings: |
                       [
+                        {
+                          "name": "SCM_DO_BUILD_DURING_DEPLOYMENT",
+                          "value": "true",
+                          "slotSetting": false
+                        },
+                        {
+                          "name": "ENABLE_ORYX_BUILD",
+                          "value": "true",
+                          "slotSetting": false
+                        },
+                        {
+                          "name": "FUNCTIONS_WORKER_RUNTIME",
+                          "value": "python",
+                          "slotSetting": false
+                        },
                         {
                           "name": "ADO_ORG",
                           "value": "kavula",
