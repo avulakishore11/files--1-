@@ -10,10 +10,15 @@ trigger:
       - main
 
 variables:
-  azureServiceConnection: 'ado-2-azure'
-  functionAppName: 'func-jira-ado-sync'
-  resourceGroup: 'kaseya-rg'
-  pythonVersion: '3.11'
+  - group: group   # ADO Library variable group (contains ADO_PAT, JIRA_WEBHOOK_SECRET)
+  - name: azureServiceConnection
+    value: 'ado-2-azure'
+  - name: functionAppName
+    value: 'func-jira-ado-sync'
+  - name: resourceGroup
+    value: 'kaseya-rg'
+  - name: pythonVersion
+    value: '3.11'
 
 # ─────────────────────────────────────────────────────────────
 # STAGE 1 — BUILD
