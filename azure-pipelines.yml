@@ -57,7 +57,8 @@ stages:
                 --exclude="venv/*" \
                 --exclude="*.pyc" \
                 --exclude="azure-pipelines.yml" \
-                --exclude="main.yml"
+                --exclude="main.yml" \
+                --exclude="DEPLOYMENT.md"
             displayName: 'Zip source + packages'
 
           - task: PublishBuildArtifacts@1
@@ -94,6 +95,25 @@ stages:
                     appType: 'functionAppLinux'
                     appName: '$(functionAppName)'
                     package: '$(Pipeline.Workspace)/drop/release.zip'
+
+                - task: AzureCLI@2
+                  displayName: 'Smoke test — verify function is registered'
+                  inputs:
+                    azureSubscription: '$(azureServiceConnection)'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      echo "Waiting 30s for function host to start..."
+                      sleep 30
+                      COUNT=$(az functionapp function list \
+                        --resource-group $(resourceGroup) \
+                        --name $(functionAppName) \
+                        --query "length(@)" \
+                        --output tsv 2>/dev/null || echo "0")
+                      echo "Functions registered: $COUNT"
+                      if [ "$COUNT" -eq "0" ]; then
+                        echo "##[warning]No functions found — check Application Insights for startup errors."
+                      fi
 
                 - task: AzureAppServiceSettings@1
                   displayName: 'Apply app settings'
