@@ -124,11 +124,6 @@ stages:
                     appSettings: |
                       [
                         {
-                          "name": "FUNCTIONS_WORKER_RUNTIME",
-                          "value": "python",
-                          "slotSetting": false
-                        },
-                        {
                           "name": "ADO_ORG",
                           "value": "kavula",
                           "slotSetting": false
